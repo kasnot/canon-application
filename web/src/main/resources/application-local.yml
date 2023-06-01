@@ -1,15 +1,12 @@
 logging:
   level:
-    example.api: DEBUG
-
-# Mail settings
-mail:
-  default-subject: Test subject
+    io.pikei.api: DEBUG
 
 # Swagger settings
 swagger:
   enabled: true
 
-# Security settings
-security:
-  enabled: true
+## Canon Configuratio
+canon:
+  camera:
+    serial: 563076003549

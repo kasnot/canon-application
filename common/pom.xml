@@ -3,17 +3,32 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>example.api</groupId>
+		<groupId>io.pikei.api</groupId>
 		<artifactId>app</artifactId>
 		<version>1.0-SNAPSHOT</version>
 	</parent>
+
 	<artifactId>common</artifactId>
 	<version>1.0-SNAPSHOT</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>It's the common application module</description>
 
 	<dependencies>
-		<!-- module dependencies -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.28</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-annotations</artifactId>
+			<version>2.10.2</version>
+		</dependency>
+
+
 	</dependencies>
 
 </project>

@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 
-	<groupId>example.api</groupId>
+	<groupId>io.pikei.api</groupId>
 	<artifactId>app</artifactId>
 	<packaging>pom</packaging>
 	<version>1.0-SNAPSHOT</version>
@@ -22,6 +22,14 @@
 		<swagger.version>2.9.2</swagger.version>
 		<mail.version>1.0-SNAPSHOT</mail.version>
 		<security.version>1.0-SNAPSHOT</security.version>
+		<commons.version>2.12.0</commons.version>
+		<guava.version>31.1-jre</guava.version>
+
+		<jna.version>5.13.0</jna.version>
+		<jnaerator.version>0.12</jnaerator.version>
+		<guava.version>31.1-jre</guava.version>
+		<commons-lang3.version>3.12.0</commons-lang3.version>
+
 	</properties>
 
 	<dependencyManagement>	 
@@ -37,21 +45,31 @@
 				<artifactId>core</artifactId>
 				<version>${project.version}</version>
 			</dependency>
+
 			 <dependency>
 				<groupId>${project.groupId}</groupId>
 				<artifactId>web</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>example.mail</groupId>
-				<artifactId>mail-lib</artifactId>
-				<version>${mail.version}</version>
+				<groupId>io.pikei.canon</groupId>
+				<artifactId>canon-lib</artifactId>
+				<version>1.0-SNAPSHOT</version>
 			</dependency>
+
 			<dependency>
-				<groupId>example.security</groupId>
-				<artifactId>security-lib</artifactId>
-				<version>${security.version}</version>
+				<groupId>io.pikei.canon.framework</groupId>
+				<artifactId>canon-framework</artifactId>
+				<version>1.0-SNAPSHOT</version>
 			</dependency>
+
+			<!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${commons.version}</version>
+			</dependency>
+
 			<dependency>
 				<groupId>io.springfox</groupId>
 				<artifactId>springfox-swagger2</artifactId>
@@ -62,15 +80,23 @@
 				<artifactId>springfox-swagger-ui</artifactId>
 				<version>${swagger.version}</version>
 			</dependency>
+
+			<dependency>
+				<groupId>org.projectlombok</groupId>
+				<artifactId>lombok</artifactId>
+				<version>1.18.28</version>
+				<scope>provided</scope>
+			</dependency>
+
     	</dependencies>
 	</dependencyManagement>
 
  	<modules>
-		<module>mail-lib</module>     <!-- mail library example to provide mail services that can be used in another projects -->
-		<module>security-lib</module> <!-- security library example to provide security services that can be used in another projects -->
+		<module>canon-lib</module> <!-- security library example to provide security services that can be used in another projects -->
         <module>common</module>       <!-- dto, api interfaces, any other common data -->
         <module>core</module> 	      <!-- repositories, entities, business logic, mappers, etc -->
-        <module>web</module>          <!-- web app boot with the rest controllers, etc -->
+        <module>web</module>
+		<module>canon-framework</module>
 	</modules>
     
 </project>
