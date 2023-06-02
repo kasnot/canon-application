@@ -352,7 +352,7 @@ public final class CameraManager {
                             sessionAlreadyOpen = true;
                         } catch (EdsdkErrorException e) {
                             // From tests, should throw EdsdkCommDisconnectedErrorException if not connected
-                            log.info("Error ignored while testing if camera is connected to open session", e);
+                            log.info("Error ignored while testing if camera is connected to open session");
                             bodyIDEx = "";
                         }
 

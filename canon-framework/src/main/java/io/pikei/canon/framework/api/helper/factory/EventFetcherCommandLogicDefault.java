@@ -72,12 +72,12 @@ public class EventFetcherCommandLogicDefault implements EventFetcherLogic {
             try {
                 fetchEvent().get();
             } catch (Exception e) {
-                log.warn("Ignored exception in event logic scheduler", e);
+                log.warn("Ignored exception in event logic scheduler");
             }
             try {
                 sleepAfterFetchEvent();
             } catch (Exception e) {
-                log.warn("Ignored exception in event logic scheduler", e);
+                log.warn("Ignored exception in event logic scheduler");
             }
         }
         log.info("Event scheduler end");

@@ -1,5 +1,6 @@
 package io.pikei.canon;
 
+import io.pikei.canon.framework.api.constant.*;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -8,9 +9,6 @@ import io.pikei.canon.framework.api.camera.CameraManager;
 import io.pikei.canon.framework.api.camera.CanonCamera;
 import io.pikei.canon.framework.api.command.GetPropertyCommand;
 import io.pikei.canon.framework.api.command.builder.*;
-import io.pikei.canon.framework.api.constant.EdsPropertyEvent;
-import io.pikei.canon.framework.api.constant.EdsPropertyID;
-import io.pikei.canon.framework.api.constant.EdsSaveTo;
 import io.pikei.canon.framework.api.helper.factory.CanonFactory;
 import io.pikei.canon.framework.api.helper.logic.LiveViewLogic;
 import org.springframework.stereotype.Component;
@@ -38,6 +36,7 @@ public class CanonCameraManager {
     private static final int WAIT_FOR_RECORD_EVENT_INTERVAL = 250;
     private static final int WAIT_FOR_LIVE_VIEW_INTERVAL = 500;
     private static final int LIVE_VIEW_INTERVAL = 250;
+    private static final int WAIT_FOR_SHOOT_INTERVAL = 100;
 
     private final CanonConfiguration canonConfig;
 
@@ -47,6 +46,7 @@ public class CanonCameraManager {
     private EdsdkLibrary.EdsCameraRef cameraRef;
     private final AtomicBoolean recordEvent = new AtomicBoolean(false);
     private final AtomicBoolean liveView = new AtomicBoolean(false);
+    private final AtomicBoolean takeShoot = new AtomicBoolean(false);
 
     /**
      *
@@ -87,12 +87,14 @@ public class CanonCameraManager {
         CanonCommandFactory.get(cameraInstance.getEvent().registerObjectEventCommand());
         CanonCommandFactory.get(cameraInstance.getEvent().registerPropertyEventCommand());
         CanonCommandFactory.get(cameraInstance.getEvent().registerStateEventCommand());
+        final EdsImageQuality imageQuality = CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.ImageQuality());
+        final EdsBatteryLevel2 batteryLevel2 = CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.BatteryLevel());
         metadata = new CameraMetadata(
                 CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.ProductName()),
-                CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.ImageQuality()).description(),
+                (imageQuality != null) ? imageQuality.description() : null,
                 CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.FirmwareVersion()),
                 CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.SerialNumber()),
-                CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.BatteryLevel()).description()
+                (batteryLevel2 != null) ? batteryLevel2.description() : null
         );
     }
 
@@ -145,7 +147,9 @@ public class CanonCameraManager {
             log.info("Live view feedback.. {}", liveView.get());
             CompletableFuture.runAsync(() -> {
                 try {
+                    takeShoot.set(true);
                     ImageIO.write(liveViewLogic.getLiveViewImage(cameraRef), IMAGE_FORMAT, new File(OUTPUT_IMAGE_DIRECTORY));
+                    takeShoot.set(false);
                 } catch (IOException e) {
                     throw new IllegalStateException(e);
                 }
@@ -201,6 +205,17 @@ public class CanonCameraManager {
     }
 
     /**
+     *  Method for waiting for shoot event to finish.
+     *  @return - Status from the weight.
+     */
+    private void waitForShootEvent() throws InterruptedException {
+        while(takeShoot.get()){
+            log.info("Waiting for live shoot to be completed..");
+            Thread.sleep(WAIT_FOR_SHOOT_INTERVAL);
+        }
+    }
+
+    /**
      * Stop/Close camera session.
      */
     public void close(){
@@ -214,6 +229,7 @@ public class CanonCameraManager {
     private void closeInternal(){
         log.info("Going to close live view camera session..");
         try {
+            waitForShootEvent();
             cameraInstance.getLiveView().endLiveViewAsync().get();
         } catch (InterruptedException | ExecutionException e) {
             log.error("Unable to close live view.", e);
