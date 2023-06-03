@@ -52,8 +52,12 @@ public class CustomerController {
         logger.info("Entering in camera actions endpoint, Action: {}", action.getAction());
         if( action.getAction().equals("open") ){
             canonCameraManager.open();
-        }else if( action.getAction().equals("close") ){
+        } else if( action.getAction().equals("close") ){
             canonCameraManager.close();
+        } else if( action.getAction().equals("connect") ){
+            canonCameraManager.connect();
+        } else if( action.getAction().equals("disconnect") ){
+            canonCameraManager.disconnect();
         }
         return ResponseEntity.ok("Hello from customer api - GUEST");
     }

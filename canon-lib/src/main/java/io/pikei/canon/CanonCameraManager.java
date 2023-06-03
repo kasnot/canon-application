@@ -1,6 +1,8 @@
 package io.pikei.canon;
 
+import io.pikei.canon.framework.api.command.TerminateSdkCommand;
 import io.pikei.canon.framework.api.constant.*;
+import io.pikei.canon.framework.api.helper.initialisation.FrameworkInitialisation;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +10,6 @@ import org.blackdread.camerabinding.jna.EdsdkLibrary;
 import io.pikei.canon.framework.api.camera.CameraManager;
 import io.pikei.canon.framework.api.camera.CanonCamera;
 import io.pikei.canon.framework.api.command.GetPropertyCommand;
-import io.pikei.canon.framework.api.command.builder.*;
 import io.pikei.canon.framework.api.helper.factory.CanonFactory;
 import io.pikei.canon.framework.api.helper.logic.LiveViewLogic;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Component;
 import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class CanonCameraManager {
 
-    private static final int WAIT_TIMEOUT_THRESHOLD = 20000; //TODO Configuration.
+    private static final int WAIT_TIMEOUT_THRESHOLD = 5000; //TODO Configuration.
     private static final String IMAGE_FORMAT = "jpeg"; //TODO Configuration.
     private static final String OUTPUT_IMAGE_DIRECTORY = "output/image-data.jpg"; //TODO Configuration.
 
@@ -44,36 +44,45 @@ public class CanonCameraManager {
     private CameraMetadata metadata;
     private CanonCamera cameraInstance;
     private EdsdkLibrary.EdsCameraRef cameraRef;
-    private final AtomicBoolean recordEvent = new AtomicBoolean(false);
-    private final AtomicBoolean liveView = new AtomicBoolean(false);
-    private final AtomicBoolean takeShoot = new AtomicBoolean(false);
+    private volatile AtomicBoolean recordEvent = new AtomicBoolean(false);
+    private volatile AtomicBoolean liveView = new AtomicBoolean(false);
+    private volatile AtomicBoolean takeShoot = new AtomicBoolean(false);
+    private volatile AtomicBoolean pendingOpen = new AtomicBoolean(false);
 
     /**
-     *
+     *  Required Argument constructor.
      */
     public CanonCameraManager(final CanonConfiguration canonConfig){
         log.info("Starting up Canon Camera Manager");
         this.canonConfig = canonConfig;
-        final List<CanonCamera> availableCameras = CameraManager.getAllConnected();
-        log.info("Total connected cameras found {}", availableCameras.size());
-        availableCameras.forEach(camera -> {
-            log.info("Camera Serial Number {}", camera.getSerialNumber());
-        });
-        CameraManager.getCameraBySerialNumber(canonConfig.getSerialNumber())
+        connect();
+    }
+
+    /**
+     *
+     */
+    public void connect(){
+        if(cameraInstance != null){
+            disconnect();
+        }
+        recordEvent.set(false);
+        liveView.set(false);
+        takeShoot.set(false);
+        pendingOpen.set(false);
+        initCameraFramework();
+        CameraManager.setRefreshInterval(0);
+        CameraManager.getCameraBySerialNumber("563076003549")
                 .ifPresent(camera -> {
-                    log.info("Camera with serial [{}]: found.", canonConfig.getSerialNumber());
+                    log.info("Camera with serial [563076003549]: found.");
                     initializeCamera(camera);
                 });
+    }
 
-        CanonFactory.cameraAddedEventLogic().addCameraAddedListener(event -> {
-            log.info("Camera Added: {}", event);
-            CameraManager.getCameraBySerialNumber(canonConfig.getSerialNumber())
-                    .ifPresent(camera -> {
-                        log.info("Camera with serial [{}]: found.", canonConfig.getSerialNumber());
-                        initializeCamera(camera);
-                    });
-        });
-
+    /**
+     * Initialize Camera SDK framework.
+     */
+    private void initCameraFramework(){
+        new FrameworkInitialisation().withEventFetcherLogic().initialize();
     }
 
     /**
@@ -96,17 +105,19 @@ public class CanonCameraManager {
                 CanonCommandFactory.getCameraProperty(cameraInstance, new GetPropertyCommand.SerialNumber()),
                 (batteryLevel2 != null) ? batteryLevel2.description() : null
         );
+
+        cameraInstance.openSession();
+        log.info("Camera session opened successfully!!!");
     }
 
     public void open() {
 
-        log.info("Opening camera for live view...");
-        if( liveView.get() ){
-            log.info("Camera still recording...returning");
+        if( liveView.get() || pendingOpen.get() ){
+            log.warn("Trying to open live view is in progress... skipping, Status[LiveView]:{}, Status:[PendingOpen]: {}", liveView.get(), pendingOpen.get());
             return;
         }
-        liveView.set(true);
 
+        pendingOpen.set(true);
         CanonFactory.cameraObjectEventLogic().addCameraObjectListener(cameraRef, event -> {
             log.info("Camera Object: {}", event.toString());
         });
@@ -121,15 +132,18 @@ public class CanonCameraManager {
                 log.info("Starting taking live view...");
             }
         });
-
         CanonFactory.cameraStateEventLogic().addCameraStateListener(cameraRef, event -> {
             log.info(event.toString());
         });
 
-        cameraInstance.openSession();
-        log.info("Camera session opened successfully!!!");
-        cameraInstance.getLiveView().beginLiveViewAsync();
+        log.info("Opening camera for live view...");
+        if( liveView.get() ){
+            log.info("Camera still recording...returning");
+            return;
+        }
+        liveView.set(true);
 
+        cameraInstance.getLiveView().beginLiveViewAsync();
         if( waitForRecordEvent() != WaitStatus.SUCCESS ){
             log.error("Unable to fetch record event, returning.");
             closeInternal();
@@ -143,6 +157,7 @@ public class CanonCameraManager {
         }
 
         final LiveViewLogic liveViewLogic = CanonFactory.liveViewLogic();
+        pendingOpen.set(false);
         while( liveView.get() ){
             log.info("Live view feedback.. {}", liveView.get());
             CompletableFuture.runAsync(() -> {
@@ -219,6 +234,10 @@ public class CanonCameraManager {
      * Stop/Close camera session.
      */
     public void close(){
+        if( pendingOpen.get() ){
+            log.warn("Pending opening command, skipping");
+            return;
+        }
         liveView.set(false);
         recordEvent.set(false);
     }
@@ -228,6 +247,9 @@ public class CanonCameraManager {
      */
     private void closeInternal(){
         log.info("Going to close live view camera session..");
+        liveView.set(false);
+        recordEvent.set(false);
+        pendingOpen.set(false);
         try {
             waitForShootEvent();
             cameraInstance.getLiveView().endLiveViewAsync().get();
@@ -235,14 +257,21 @@ public class CanonCameraManager {
             log.error("Unable to close live view.", e);
         }
         log.info("Camera live view closed successfully!!!");
+    }
+
+    public void disconnect(){
+        CanonFactory.eventFetcherLogic().stop();
         cameraInstance.closeSession();
         log.info("Camera session closed successfully!!!");
-        liveView.set(false);
-        recordEvent.set(false);
-        CanonFactory.cameraObjectEventLogic().unregisterCameraObjectEvent(cameraRef);
-        CanonFactory.cameraPropertyEventLogic().unregisterCameraPropertyEvent(cameraRef);
-        CanonFactory.cameraStateEventLogic().unregisterCameraStateEvent(cameraRef);
-        log.info("Camera listeners clear, success!!!");
+        if( cameraRef != null ){
+            CanonFactory.cameraObjectEventLogic().unregisterCameraObjectEvent(cameraRef);
+            CanonFactory.cameraPropertyEventLogic().unregisterCameraPropertyEvent(cameraRef);
+            CanonFactory.cameraStateEventLogic().unregisterCameraStateEvent(cameraRef);
+            log.info("Camera listeners clear, success!!!");
+        }
+//        CanonFactory.commandDispatcher().scheduleCommand(new TerminateSdkCommand());
+        cameraInstance = null;
+        cameraRef = null;
     }
 
 }

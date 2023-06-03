@@ -112,9 +112,10 @@ public final class CameraManager {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException(e);
-            } finally {
-                setRefreshInterval(30);
             }
+//            finally {
+//                setRefreshInterval(30);
+//            }
         }
     }
 

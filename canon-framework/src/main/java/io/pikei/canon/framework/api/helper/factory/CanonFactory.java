@@ -59,7 +59,7 @@ public class CanonFactory {
     private static CanonFactory canonFactory = new CanonFactory();
 
     // TODO this is not lazy...
-    private static final CommandDispatcher commandDispatcher = SingleCommandDispatcher.getInstance();
+    private static final CommandDispatcher commandDispatcher = PikeiCommandDispatcher.getInstance();
 
     private static final EventFetcherLogic eventFetcherLogic = new EventFetcherCommandLogicDefault();
 
